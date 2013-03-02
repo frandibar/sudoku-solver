@@ -8,15 +8,15 @@ How to use:
    (require 'sudoku-solver)
 3) enter puzzle into empty buffer. i.e
    ------ buffer starts here --------
-   4 1 0 0 0 0 0 0 0
-   0 2 0 0 0 8 6 1 0
-   0 0 0 0 4 0 7 5 3
-   7 0 5 0 0 2 8 0 0
-   0 0 0 8 1 3 9 7 0
-   8 0 0 0 7 0 3 0 0
-   0 0 2 7 8 6 0 0 0
-   0 0 0 0 0 5 0 0 6
-   3 4 0 0 0 9 0 0 0
+   410000000
+   020008610
+   000040753
+   705002800
+   000813970
+   800070300
+   002786000
+   000005006
+   340009000
 4) M-x sudoku-solve-buffer RET
    After that the solution is appended to the buffer, i.e.
 

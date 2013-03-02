@@ -7,15 +7,15 @@
 ;; The solution for a puzzle can be obtained in any of two ways:
 ;; 1)
 ;;
-;; (let ((puzzle [[4 1 0 0 0 0 0 0 0]  ; sample puzzle
-;;                [0 2 0 0 0 8 6 1 0]
-;;                [0 0 0 0 4 0 7 5 3]
-;;                [7 0 5 0 0 2 8 0 0]
-;;                [0 0 0 8 1 3 9 7 0]
-;;                [8 0 0 0 7 0 3 0 0]
-;;                [0 0 2 7 8 6 0 0 0]
-;;                [0 0 0 0 0 5 0 0 6]
-;;                [3 4 0 0 0 9 0 0 0]]))
+;; (let ((puzzle ["410000000"  ; sample puzzle
+;;                "020008610"
+;;                "000040753"
+;;                "705002800"
+;;                "000813970"
+;;                "800070300"
+;;                "002786000"
+;;                "000005006"
+;;                "340009000"]))
 ;;   (sudoku puzzle))
 ;;
 ;; Empty spaces should be completed with 0.
@@ -25,15 +25,15 @@
 ;; M-x sudoku-solve-buffer RET
 ;; i.e.
 ;; ------ buffer starts here --------
-;; 4 1 0 0 0 0 0 0 0
-;; 0 2 0 0 0 8 6 1 0
-;; 0 0 0 0 4 0 7 5 3
-;; 7 0 5 0 0 2 8 0 0
-;; 0 0 0 8 1 3 9 7 0
-;; 8 0 0 0 7 0 3 0 0
-;; 0 0 2 7 8 6 0 0 0
-;; 0 0 0 0 0 5 0 0 6
-;; 3 4 0 0 0 9 0 0 0
+;; 410000000
+;; 020008610
+;; 000040753
+;; 705002800
+;; 000813970
+;; 800070300
+;; 002786000
+;; 000005006
+;; 340009000
 ;;
 ;; Solution
 ;; +-------+-------+-------+
@@ -50,21 +50,22 @@
 ;; ┃ 3 4 6 ┃ 1 2 9 ┃ 5 8 7 ┃
 ;; +-------+-------+-------+
 
+;; TODO: use vector of strings instead of vector of vector as data structure
+
 (require 'cl)                           ; for position
 
 (provide 'sudoku-solver)
 
 
 (defun getval (rown coln grid)
-  (aref (row rown grid) coln))
+  (aref (aref grid rown) coln))
 
 (defun setval (newval rown coln grid)
   (let ((r (row rown grid)))
-    (aset r coln newval)
-    (aset grid rown r)))
+    (aset r coln newval)))
 
 (defun empty (rown coln grid)
-  (= (getval rown coln grid) 0))
+  (= (getval rown coln grid) ?0))
 
 (defun row (rown grid)
   (aref grid rown))
@@ -73,21 +74,20 @@
   (mapcar (lambda (r) (aref r coln)) grid))
 
 (defun cuad (n grid)
-  (flet ((join (vec)
-               (reduce (lambda (x y) (vconcat x y)) vec)))
-    (let ((colfrom (* 3 (mod n 3)))
-          (rowfrom (cond ((< n 3) 0)
-                         ((< n 6) 3)
-                         (t 6))))
-      (join (mapcar (lambda (r) (subseq r colfrom (+ 3 colfrom)))
-                    (subseq grid rowfrom (+ 3 rowfrom)))))))
+  (let ((colfrom (* 3 (mod n 3)))
+        (rowfrom (cond ((< n 3) 0)
+                       ((< n 6) 3)
+                       (t 6))))
+    (reduce (lambda (x y) (concat x y))
+            (mapcar (lambda (r) (subseq r colfrom (+ 3 colfrom)))
+                    (subseq grid rowfrom (+ 3 rowfrom))))))
 
 (defun valid (row-col-cuad)
   "Returns t if ROW-COL-CUAD has all numbers 1 to 9, nil otherwise."
   (and (reduce (lambda (x y) (and x y))
                (mapcar (lambda (k) (position k row-col-cuad))
-                       (number-sequence 1 9)))
-       t))                              ; hack to return t instead of a number
+                       "123456789"))
+       t))                     ; hack to return t instead of a number
 
 (defun check (grid)
   "Returns the list ((valid rows) (valid cols) (valid cuads))"
@@ -111,7 +111,7 @@
 
 (defun missing (row-col-cuad)
   (let (ret)
-    (dolist (i (number-sequence 1 9) ret)
+    (dolist (i (string-to-list "123456789") ret)
       (if (not (position i row-col-cuad))
           (setq ret (append ret (list i)))))))
 
@@ -137,7 +137,7 @@
             (try-next (car nxt) (cadr nxt) grid)
           grid)
       (let ((ret)
-            (newgrid (copy-grid grid))
+            (newgrid (list->vector (mapcar (lambda (x) (copy-seq x)) grid)))
             (cand (candidates rown coln grid)))
         (dolist (n cand ret)
           (unless ret
@@ -153,27 +153,14 @@
     (setq max-lisp-eval-depth 6000)
     (unwind-protect
         (try-next 0 0 grid)
-      ;; restore previous value
+      ;; restore previous value for stack limit
       (setq max-lisp-eval-depth tmp))))
-
-(defun copy-grid (grid)
-  ;; TODO: there must be another way of copying sequences without references!?
-  (let ((newgrid (make-vector 9 0)))
-    (dotimes (rown 9 newgrid)
-      (aset newgrid rown (make-vector 9 0))
-      (dotimes (coln 9)
-        (aset (aref newgrid rown) coln (getval rown coln grid))))
-    newgrid))
 
 (defun input->grid ()
   "Reads the input from buffer and loads the matrix data structure."
   (list->vector
-   (mapcar (lambda (lst) (list->vector lst))
-           (mapcar (lambda (lst) (mapcar (lambda (num) (string-to-number num))
-                                    lst))
-                   (mapcar (lambda (line) (split-string line " "))
-                           (split-string (buffer-substring-no-properties 1 162)
-                                         "\n" t))))))
+   (split-string (buffer-substring-no-properties 1 90)
+                 "\n" t)))
 
 (defun list->vector (lst)
   "Returns a vector with the elements of list LST."
@@ -196,7 +183,7 @@ START-GRID is passed in order to show fixed numbers in different color."
         (if (and show-grid
                  (= (mod c 3) 0))
             (insert "┃ "))
-        (insert (int-to-string (getval r c grid)) " ")
+        (insert (getval r c grid) " ")
         (if (not (empty r c start-grid))
             (put-text-property (- (point) 2) (point) 'face 'font-lock-keyword-face)))
       (if show-grid
@@ -210,15 +197,15 @@ START-GRID is passed in order to show fixed numbers in different color."
 Empty spaces should be completed with 0.
 
 For example, if we have a buffer with:
-0 0 6 4 0 2 0 0 5
-0 7 8 0 0 0 0 0 0
-0 9 0 8 3 0 4 0 0
-5 0 4 7 6 3 9 0 1
-7 6 9 2 8 1 0 0 0
-1 0 3 0 0 4 0 0 6
-0 0 0 3 1 5 0 2 0
-9 0 1 6 0 0 0 3 0
-6 0 0 9 0 7 0 5 0
+006402005
+078000000
+090830400
+504763901
+769281000
+103004006
+000315020
+901600030
+600907050
 
 Use M-x sudoku-solve-buffer to show the solution.
 "
